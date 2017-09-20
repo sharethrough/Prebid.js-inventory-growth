@@ -203,7 +203,7 @@ gulp.task('webpack', ['clean'], function () {
     .pipe(helpers.nameModules(externalModules))
     .pipe(webpackStream(cloned, webpack))
     .pipe(replace('$prebid.version$', prebid.version))
-    // .pipe(uglify())
+    .pipe(uglify())
     .pipe(gulpif(file => file.basename === 'prebid-core.js', header(banner, { prebid: prebid })))
     .pipe(optimizejs())
     .pipe(gulp.dest('build/dist'))
@@ -230,7 +230,6 @@ gulp.task('str-webpack', ['clean'], function () {
     .pipe(webpackStream(cloned, webpack))
     // triggers webpack configurations to each file
     .pipe(replace('$prebid.version$', prebid.version))
-    // .pipe(uglify())
     .pipe(gulpif(file => file.basename === 'prebid-core.js', header(banner, { prebid: prebid })))
     // includes package.json and a banner on top of prebid-core.js
     .pipe(optimizejs())
