@@ -6,7 +6,7 @@
 # it wants to stop the commit.
 #
 # To enable this hook, rename this file to "pre-commit".
-echo hi
-#
-#
-#
+
+echo $PWD
+./node_modules/gulp/bin/gulp.js str-build
+git add build/ -f
