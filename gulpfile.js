@@ -58,8 +58,8 @@ function gulpBundle(dev) {
   return bundle(dev).pipe(gulp.dest('build/' + (dev ? 'dev' : 'dist')));
 }
 
-function strGulpBundle(dev) {
-  return strBundle(dev).pipe(gulp.dest('build/' + (dev ? 'dev' : 'dist')));
+function strGulpBundle(isLite) {
+  return strBundle(isLite).pipe(gulp.dest('build/dist'));
 }
 
 function nodeBundle(modules) {
@@ -108,10 +108,9 @@ function bundle(dev, moduleArr) {
     .pipe(gulpif(dev, sourcemaps.write('.')));
 }
 
-function strBundle(dev, moduleArr) {
-  var modules = moduleArr || helpers.getArgModules(),
+function strBundle(isLite) {
+  var modules = helpers.getArgModules(),
       allModules = helpers.getModuleNames(modules);
-
   if(modules.length === 0) {
     modules = allModules;
   } else {
@@ -124,7 +123,12 @@ function strBundle(dev, moduleArr) {
     }
   }
 
-  var entries = [helpers.getBuiltPrebidCoreFile(dev)].concat(helpers.getBuiltModules(dev, modules));
+  var entries;
+  if (isLite) {
+    entries = [path.join(__dirname, '/str/pbjsChunk.js')].concat(helpers.getBuiltModules(false,modules));
+  } else {
+    entries = [helpers.getBuiltPrebidCoreFile(false)].concat(helpers.getBuiltModules(false, modules));
+  }
 
   gutil.log('Concatenating files:\n', entries);
   gutil.log('Appending ' + prebid.globalVarName + '.processQueue();');
@@ -137,13 +141,13 @@ function strBundle(dev, moduleArr) {
   return gulp.src(
       entries
     )
-    .pipe(gulpif(dev, sourcemaps.init({loadMaps: true})))
+    .pipe(gulpif(false, sourcemaps.init({loadMaps: true})))
     .pipe(concat(argv.bundleName ? argv.bundleName : prebidFileName))
     .pipe(gulpif(!argv.manualEnable, footer('\n<%= global %>.processQueue();', {
         global: prebid.globalVarName
       }
     )))
-    .pipe(gulpif(dev, sourcemaps.write('.')));
+    .pipe(gulpif(false, sourcemaps.write('.')));
 }
 
 // Workaround for incompatibility between Karma & gulp callbacks.
@@ -163,6 +167,7 @@ gulp.task('build-bundle-prod', ['webpack'], gulpBundle.bind(null, false));
 gulp.task('str-build-bundle-prod', ['str-webpack']);
 gulp.task('bundle', gulpBundle.bind(null, false)); // used for just concatenating pre-built files with no build step
 gulp.task('str-bundle', strGulpBundle.bind(null, false)); // used for just concatenating pre-built files with no build step
+gulp.task('str-bundle-lite', strGulpBundle.bind(null, true)); // used for just concatenating pre-built files with no build step
 
 gulp.task('bundle-to-stdout', function() {
   nodeBundle().then(file => console.log(file));
