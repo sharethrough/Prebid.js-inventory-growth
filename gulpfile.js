@@ -58,8 +58,8 @@ function gulpBundle(dev) {
   return bundle(dev).pipe(gulp.dest('build/' + (dev ? 'dev' : 'dist')));
 }
 
-function strGulpBundle(isLite) {
-  return strBundle(isLite).pipe(gulp.dest('build/dist'));
+function strGulpBundle() {
+  return strBundle().pipe(gulp.dest('build/dist'));
 }
 
 function nodeBundle(modules) {
@@ -108,7 +108,7 @@ function bundle(dev, moduleArr) {
     .pipe(gulpif(dev, sourcemaps.write('.')));
 }
 
-function strBundle(isLite) {
+function strBundle() {
   var modules = helpers.getArgModules(),
       allModules = helpers.getModuleNames(modules);
   if(modules.length === 0) {
@@ -123,13 +123,7 @@ function strBundle(isLite) {
     }
   }
 
-  var entries;
-  if (isLite) {
-    entries = [path.join(__dirname, '/str/pbjsChunk.js')].concat(helpers.getBuiltModules(false,modules));
-  } else {
-    entries = [helpers.getBuiltPrebidCoreFile(false)].concat(helpers.getBuiltModules(false, modules));
-  }
-
+  var entries = [helpers.getBuiltPrebidCoreFile(false)].concat(helpers.getBuiltModules(false, modules));
   gutil.log('Concatenating files:\n', entries);
   gutil.log('Appending ' + prebid.globalVarName + '.processQueue();');
 
@@ -166,8 +160,8 @@ gulp.task('build-bundle-dev', ['devpack'], gulpBundle.bind(null, true));
 gulp.task('build-bundle-prod', ['webpack'], gulpBundle.bind(null, false));
 gulp.task('str-build-bundle-prod', ['str-webpack']);
 gulp.task('bundle', gulpBundle.bind(null, false)); // used for just concatenating pre-built files with no build step
-gulp.task('str-bundle', strGulpBundle.bind(null, false)); // used for just concatenating pre-built files with no build step
-gulp.task('str-bundle-lite', strGulpBundle.bind(null, true)); // used for just concatenating pre-built files with no build step
+gulp.task('str-create-full', strGulpBundle.bind(null, false)); // used for just concatenating pre-built files with no build step
+gulp.task('str-create-lite', ['str-webpack-lite']); // used for just concatenating pre-built files with no build step
 
 gulp.task('bundle-to-stdout', function() {
   nodeBundle().then(file => console.log(file));
@@ -217,20 +211,16 @@ gulp.task('webpack', ['clean'], function () {
 
 gulp.task('str-webpack', ['clean'], function () {
   var cloned = _.cloneDeep(webpackConfig);
-
+  var externalModules = helpers.getArgModules();
+  const moduleSources = helpers.getModulePaths(externalModules);
   delete cloned.devtool;
 
-  var externalModules = helpers.getArgModules();
-
-  const analyticsSources = helpers.getAnalyticsSources(analyticsDirectory);
-  const moduleSources = helpers.getModulePaths(externalModules);
-  let modulesWanted = [];
   if (argv.modules) {
     modulesWanted = argv.modules.split(',');
   }
-  return gulp.src([].concat(moduleSources, analyticsSources, 'src/prebid.js'))
+  return gulp.src([].concat(moduleSources, 'src/prebid.js'))
     // creates a stream of files at these paths
-    .pipe(helpers.nameModules(externalModules, modulesWanted))
+    .pipe(helpers.nameModules(externalModules))
     // names each file and outputs it as a new file
     .pipe(webpackStream(cloned, webpack))
     // triggers webpack configurations to each file
@@ -241,6 +231,32 @@ gulp.task('str-webpack', ['clean'], function () {
     .pipe(gulp.dest('build/dist'))
     .pipe(connect.reload());
 });
+
+gulp.task('str-webpack-lite', function() {
+  const moduleSources = helpers.getModulePaths(externalModules);
+  var cloned = _.cloneDeep(webpackConfig);
+  var externalModules = helpers.getArgModules();
+  var modulesWanted = [];
+  var newName;
+  delete cloned.devtool;
+  cloned.plugins.pop(); // remove common chunk plugin from cloned webpack config
+  if (argv.modules) {
+    modulesWanted = argv.modules.split(',');
+  }
+
+  if (argv.tag && argv.tag.length) {
+    newName = 'prebid-lite.' + argv.tag;
+  }
+
+  return gulp.src([].concat(moduleSources, 'src/prebid.js'))
+    .pipe(helpers.createLiteFiles(externalModules, modulesWanted, newName))
+    .pipe(webpackStream(cloned, webpack))
+    .pipe(replace('$prebid.version$', prebid.version))
+    .pipe(header(banner, { prebid: prebid }))
+    .pipe(optimizejs())
+    .pipe(gulp.dest('build/dist'))
+    .pipe(connect.reload());
+})
 
 // Run the unit tests.
 //

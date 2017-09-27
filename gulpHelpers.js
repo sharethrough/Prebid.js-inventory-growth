@@ -120,6 +120,20 @@ module.exports = {
     })
   },
 
+  createLiteFiles: function(externalModules, modulesWanted, newName) {
+    var modules = this.getModules(externalModules);
+
+    return through.obj(function(file, enc, done) {
+      // if no modules are specified, push all the modules
+      if (!modulesWanted.length || modulesWanted.indexOf(modules[file.path]) > -1
+       || file.path.indexOf('prebid.js') > -1) {
+        file.named = newName || 'prebid-lite';
+        this.push(file);
+      }
+
+      done();
+    })
+  },
   /*
    * Get source files for analytics subdirectories in top-level `analytics`
    * directory adjacent to Prebid.js.
