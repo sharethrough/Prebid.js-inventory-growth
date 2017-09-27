@@ -209,7 +209,7 @@ gulp.task('webpack', ['clean'], function () {
     .pipe(connect.reload());
 });
 
-gulp.task('str-webpack', ['clean'], function () {
+gulp.task('str-webpack', function () {
   var cloned = _.cloneDeep(webpackConfig);
   var externalModules = helpers.getArgModules();
   const moduleSources = helpers.getModulePaths(externalModules);
@@ -254,7 +254,7 @@ gulp.task('str-webpack-lite', function() {
     .pipe(replace('$prebid.version$', prebid.version))
     .pipe(header(banner, { prebid: prebid }))
     .pipe(optimizejs())
-    .pipe(gulp.dest('build/dist'))
+    .pipe(gulp.dest('build/lite'))
     .pipe(connect.reload());
 })
 
