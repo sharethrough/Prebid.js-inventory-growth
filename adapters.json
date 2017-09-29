@@ -1,5 +1,4 @@
 [
-  "oftmedia",
   "aardvark",
   "adblade",
   "adbund",
@@ -82,6 +81,11 @@
   {
     "appnexus": {
       "alias": "brealtime"
+    }
+  },
+  {
+    "appnexus": {
+      "alias": "oftmedia"
     }
   },
   {
