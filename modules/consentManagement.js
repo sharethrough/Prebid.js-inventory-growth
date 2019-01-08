@@ -17,13 +17,26 @@ const DEFAULT_ALLOW_AUCTION_WO_CONSENT = true;
 export let userCMP;
 export let consentTimeout;
 export let allowAuction;
+export let staticConsentData;
 
 let consentData;
+let addedConsentHook = false;
 
 // add new CMPs here, with their dedicated lookup function
 const cmpCallMap = {
-  'iab': lookupIabConsent
+  'iab': lookupIabConsent,
+  'static': lookupStaticConsentData
 };
+
+/**
+ * This function reads the consent string from the config to obtain the consent information of the user.
+ * @param {function(string)} cmpSuccess acts as a success callback when the value is read from config; pass along consentObject (string) from CMP
+ * @param {function(string)} cmpError acts as an error callback while interacting with the config string; pass along an error message (string)
+ * @param {object} hookConfig contains module related variables (see comment in requestBidsHook function)
+ */
+function lookupStaticConsentData(cmpSuccess, cmpError, hookConfig) {
+  cmpSuccess(staticConsentData, hookConfig);
+}
 
 /**
  * This function handles interacting with an IAB compliant CMP to obtain the consent information of the user.
@@ -44,11 +57,11 @@ function lookupIabConsent(cmpSuccess, cmpError, hookConfig) {
     }
 
     return {
-      consentDataCallback: function(consentResponse) {
+      consentDataCallback: function (consentResponse) {
         cmpResponse.getConsentData = consentResponse;
         afterEach();
       },
-      vendorConsentsCallback: function(consentResponse) {
+      vendorConsentsCallback: function (consentResponse) {
         cmpResponse.getVendorConsents = consentResponse;
         afterEach();
       }
@@ -70,7 +83,7 @@ function lookupIabConsent(cmpSuccess, cmpError, hookConfig) {
   // if the CMP is not found, the iframe function will call the cmpError exit callback to abort the rest of the CMP workflow
   try {
     cmpFunction = window.__cmp || utils.getWindowTop().__cmp;
-  } catch (e) {}
+  } catch (e) { }
 
   if (utils.isFn(cmpFunction)) {
     cmpFunction('getConsentData', null, callbackHandler.consentDataCallback);
@@ -85,7 +98,7 @@ function lookupIabConsent(cmpSuccess, cmpError, hookConfig) {
     while (!cmpFrame) {
       try {
         if (f.frames['__cmpLocator']) cmpFrame = f;
-      } catch (e) {}
+      } catch (e) { }
       if (f === window.top) break;
       f = f.parent;
     }
@@ -127,13 +140,15 @@ function lookupIabConsent(cmpSuccess, cmpError, hookConfig) {
   function callCmpWhileInIframe(commandName, cmpFrame, moduleCallback) {
     /* Setup up a __cmp function to do the postMessage and stash the callback.
       This function behaves (from the caller's perspective identicially to the in-frame __cmp call */
-    window.__cmp = function(cmd, arg, callback) {
+    window.__cmp = function (cmd, arg, callback) {
       let callId = Math.random() + '';
-      let msg = {__cmpCall: {
-        command: cmd,
-        parameter: arg,
-        callId: callId
-      }};
+      let msg = {
+        __cmpCall: {
+          command: cmd,
+          parameter: arg,
+          callId: callId
+        }
+      };
       cmpCallbacks[callId] = callback;
       cmpFrame.postMessage(msg, '*');
     }
@@ -348,7 +363,20 @@ export function setConfig(config) {
     allowAuction = DEFAULT_ALLOW_AUCTION_WO_CONSENT;
     utils.logInfo(`consentManagement config did not specify allowAuctionWithoutConsent.  Using system default setting (${DEFAULT_ALLOW_AUCTION_WO_CONSENT}).`);
   }
+
   utils.logInfo('consentManagement module has been activated...');
-  $$PREBID_GLOBAL$$.requestBids.addHook(requestBidsHook, 50);
+
+  if (userCMP === 'static') {
+    if (utils.isPlainObject(config.consentData)) {
+      staticConsentData = config.consentData;
+      consentTimeout = 0;
+    } else {
+      utils.logError(`consentManagement config with cmpApi: 'static' did not specify consentData. No consents will be available to adapters.`);
+    }
+  }
+  if (!addedConsentHook) {
+    $$PREBID_GLOBAL$$.requestBids.addHook(requestBidsHook, 50);
+  }
+  addedConsentHook = true;
 }
 config.getConfig('consentManagement', config => setConfig(config.consentManagement));
