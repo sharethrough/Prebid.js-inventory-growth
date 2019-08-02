@@ -119,6 +119,7 @@ function getLargestSize(sizes) {
 }
 
 function generateAd(body, req) {
+  console.log('generating ad markup');
   const strRespId = `str_response_${req.data.bidId}`;
 
   let adMarkup = `
@@ -133,16 +134,46 @@ function generateAd(body, req) {
   } else {
     // Break out of iframe
     adMarkup = adMarkup + `
-      <script src="//native.sharethrough.com/assets/sfp-set-targeting.js"></script>
       <script>
         (function() {
-          if (!(window.STR && window.STR.Tag) && !(window.top.STR && window.top.STR.Tag)) {
+          // are we in a safeframe? if so, we should not break out and we should load sfp.js directly
+          var safeframeDetected = false;
+          try {
+            window.top.location.href;
+          } catch (e) {
+            if (e instanceof DOMException) {
+              safeframeDetected = true;
+            }
+          }
+          console.log("We were in a safeframe: ", safeframeDetected);
+          
+          if (!safeframeDetected) {
+            var sfp_iframe_buster_js = document.createElement('script');
+            sfp_iframe_buster_js.src = "//native.sharethrough.com/assets/sfp-set-targeting.js";
+            sfp_iframe_buster_js.type = 'text/javascript';
+            try {
+                window.document.getElementsByTagName('body')[0].appendChild(sfp_iframe_buster_js);
+                console.log("We appended sfp-set-targeting.js");
+            } catch (e) {
+              console.log(e);
+            }
+          }
+          
+          var clientJsLoaded = ((window.STR && window.STR.Tag) || (window.top.STR && window.top.STR.Tag));
+          console.log("ClientJS is already loaded: ", clientJsLoaded);
+          if (!clientJsLoaded) {
             var sfp_js = document.createElement('script');
             sfp_js.src = "//native.sharethrough.com/assets/sfp.js";
             sfp_js.type = 'text/javascript';
-            sfp_js.charset = 'utf-8';
+            
             try {
+              if (safeframeDetected) {
+                window.document.getElementsByTagName('body')[0].appendChild(sfp_js);
+                console.log("We appended sfp.js to window.document");
+              } else {
                 window.top.document.getElementsByTagName('body')[0].appendChild(sfp_js);
+                console.log("We appended sfp.js to window.top.document");
+              }
             } catch (e) {
               console.log(e);
             }
@@ -151,6 +182,8 @@ function generateAd(body, req) {
     </script>`
   }
 
+  console.log('returning ad markup');
+  console.log(adMarkup);
   return adMarkup;
 }
 

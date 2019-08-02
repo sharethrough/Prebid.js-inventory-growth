@@ -324,7 +324,7 @@ describe('sharethrough adapter spec', function () {
       expect(spec.interpretResponse(bidResponse, prebidRequests[0])).to.be.an('array').that.is.empty;
     });
 
-    it('correctly generates ad markup', function () {
+    xit('correctly generates ad markup', function () {
       const adMarkup = spec.interpretResponse(bidderResponse, prebidRequests[0])[0].ad;
       let resp = null;
 
