@@ -40,7 +40,7 @@ export const sharethroughAdapterSpec = {
         stayInIframe: bidRequest.params.iframe,
         iframeSize: bidRequest.params.iframeSize,
         sizes: bidRequest.sizes
-      }
+      };
 
       return {
         method: 'GET',
@@ -59,7 +59,7 @@ export const sharethroughAdapterSpec = {
     const creative = body.creatives[0];
     let size = DEFAULT_SIZE;
     if (req.strData.iframeSize || req.strData.sizes.length) {
-      size = req.strData.iframeSize != undefined
+      size = req.strData.iframeSize
         ? req.strData.iframeSize
         : getLargestSize(req.strData.sizes);
     }
@@ -102,7 +102,7 @@ export const sharethroughAdapterSpec = {
 
   // Empty implementation for prebid core to be able to find it
   onSetTargeting: (bid) => {}
-}
+};
 
 function getLargestSize(sizes) {
   function area(size) {
@@ -119,14 +119,13 @@ function getLargestSize(sizes) {
 }
 
 function generateAd(body, req) {
-  console.log('generating ad markup');
   const strRespId = `str_response_${req.data.bidId}`;
 
   let adMarkup = `
     <div data-str-native-key="${req.data.placement_key}" data-stx-response-name="${strRespId}">
     </div>
     <script>var ${strRespId} = "${b64EncodeUnicode(JSON.stringify(body))}"</script>
-  `
+  `;
 
   if (req.strData.stayInIframe) {
     // Don't break out of iframe
@@ -145,7 +144,6 @@ function generateAd(body, req) {
               safeframeDetected = true;
             }
           }
-          console.log("We were in a safeframe: ", safeframeDetected);
           
           if (!safeframeDetected) {
             var sfp_iframe_buster_js = document.createElement('script');
@@ -153,14 +151,12 @@ function generateAd(body, req) {
             sfp_iframe_buster_js.type = 'text/javascript';
             try {
                 window.document.getElementsByTagName('body')[0].appendChild(sfp_iframe_buster_js);
-                console.log("We appended sfp-set-targeting.js");
             } catch (e) {
-              console.log(e);
+              console.error(e);
             }
           }
           
-          var clientJsLoaded = ((window.STR && window.STR.Tag) || (window.top.STR && window.top.STR.Tag));
-          console.log("ClientJS is already loaded: ", clientJsLoaded);
+          var clientJsLoaded = (safeframeDetected) ? !!(window.STR && window.STR.Tag) : !!(window.top.STR && window.top.STR.Tag);
           if (!clientJsLoaded) {
             var sfp_js = document.createElement('script');
             sfp_js.src = "//native.sharethrough.com/assets/sfp.js";
@@ -169,21 +165,17 @@ function generateAd(body, req) {
             try {
               if (safeframeDetected) {
                 window.document.getElementsByTagName('body')[0].appendChild(sfp_js);
-                console.log("We appended sfp.js to window.document");
               } else {
                 window.top.document.getElementsByTagName('body')[0].appendChild(sfp_js);
-                console.log("We appended sfp.js to window.top.document");
               }
             } catch (e) {
-              console.log(e);
+              console.error(e);
             }
           }
         })()
     </script>`
   }
 
-  console.log('returning ad markup');
-  console.log(adMarkup);
   return adMarkup;
 }
 
