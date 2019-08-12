@@ -127,13 +127,13 @@ const b64EncodeUnicode = (str) => {
       function toSolidBytes(match, p1) {
         return String.fromCharCode('0x' + p1);
       }));
-}
+};
 
 const setUserAgent = (str) => {
   window.navigator['__defineGetter__']('userAgent', function () {
     return str;
   });
-}
+};
 
 describe('sharethrough adapter spec', function () {
   describe('.code', function () {
@@ -324,7 +324,7 @@ describe('sharethrough adapter spec', function () {
       expect(spec.interpretResponse(bidResponse, prebidRequests[0])).to.be.an('array').that.is.empty;
     });
 
-    xit('correctly generates ad markup', function () {
+    it('correctly generates ad markup', function () {
       const adMarkup = spec.interpretResponse(bidderResponse, prebidRequests[0])[0].ad;
       let resp = null;
 
@@ -334,11 +334,7 @@ describe('sharethrough adapter spec', function () {
         /data-str-native-key="pKey" data-stx-response-name=\"str_response_bidId\"/);
       expect(!!adMarkup.indexOf(resp)).to.eql(true);
       expect(adMarkup).to.match(
-        /<script src="\/\/native.sharethrough.com\/assets\/sfp-set-targeting.js"><\/script>/);
-      expect(adMarkup).to.match(
-        /sfp_js.src = "\/\/native.sharethrough.com\/assets\/sfp.js";/);
-      expect(adMarkup).to.match(
-        /window.top.document.getElementsByTagName\('body'\)\[0\].appendChild\(sfp_js\);/)
+        /iFrameHandler/);
     });
 
     it('correctly generates ad markup for staying in iframe', function () {
@@ -387,5 +383,56 @@ describe('sharethrough adapter spec', function () {
       const syncArray = spec.getUserSyncs({ pixelEnabled: false }, serverResponses);
       expect(syncArray).to.be.an('array').that.is.empty;
     });
+  });
+
+  describe('shareThroughIframeHandler', function () {
+    describe('we are in a safeframe', function () {
+      const originalWindow = global.window;
+      let detectorStub, windowSpy, windowTopSpy;
+
+      beforeEach(function() {
+        windowSpy = sinon.spy(window.document, 'getElementsByTagName');
+        windowTopSpy = sinon.spy(window.top.document, 'getElementsByTagName');
+
+        global.window = {
+          top: {
+            location: {
+              toString: () => { throw new DOMException() }
+            }
+          }
+        };
+      });
+
+      afterEach(function() {
+        windowSpy.restore();
+        windowTopSpy.restore();
+        global.window = originalWindow;
+      });
+
+      it('appends sfp.js to the safeframe', function () {
+        spec.iFrameHandler();
+        expect(windowSpy.calledOnce).to.be.true;
+      });
+
+      it('does not append anything if sfp.js is already loaded', function () {
+        window['__defineGetter__'](
+          'STR', function() { return { Tag: true } }
+        );
+        // let tagDetectorStub = sinon.stub(window, 'STR').returns({ Tag: true });
+        spec.iFrameHandler();
+        expect(windowSpy.notCalled).to.be.true;
+        expect(windowTopSpy.notCalled).to.be.true;
+        // tagDetectorStub.restore();
+      });
+    });
+
+    // describe('we are in a regular iframe', function () {
+    //   let detectorStub, windowSpy, windowTopSpy;
+    //   it('appends sfp.js to window.top', function () {
+    //   });
+    //
+    //   it('only appends sfp-set-targeting.js if sfp.js is already loaded', function () {
+    //   });
+    // });
   });
 });

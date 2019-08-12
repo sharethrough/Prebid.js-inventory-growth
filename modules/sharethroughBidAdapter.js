@@ -5,12 +5,20 @@ const BIDDER_CODE = 'sharethrough';
 const STR_ENDPOINT = document.location.protocol + '//btlr.sharethrough.com/WYu2BXv1/v1';
 const DEFAULT_SIZE = [1, 1];
 
+let SAFEFRAME_DETECTED;
+let IFRAMES_FOUND;
+let IFRAME_STACK;
+
 export const sharethroughAdapterSpec = {
   code: BIDDER_CODE,
 
   isBidRequestValid: bid => !!bid.params.pkey && bid.bidder === BIDDER_CODE,
 
   buildRequests: (bidRequests, bidderRequest) => {
+    console.log(bidderRequest)
+    SAFEFRAME_DETECTED = !bidderRequest.reachedTop;
+    IFRAMES_FOUND = bidderRequest.numIframes;
+    IFRAME_STACK = bidderRequest.stack;
     return bidRequests.map(bidRequest => {
       let query = {
         placement_key: bidRequest.params.pkey,
@@ -101,7 +109,50 @@ export const sharethroughAdapterSpec = {
   onBidWon: (bid) => {},
 
   // Empty implementation for prebid core to be able to find it
-  onSetTargeting: (bid) => {}
+  onSetTargeting: (bid) => {},
+
+  isInSafeframe: () => {
+    window.safeframeDetected = false;
+    try {
+      window.safeframeDetected = !window.top.location.toString();
+    } catch (e) {
+      window.safeframeDetected = (e instanceof DOMException);
+    }
+  },
+
+  iFrameHandler: () => {
+    // are we in a safeframe? if so, we should not break out and we should load sfp.js directly
+    if (!window.safeframeDetected) {
+      var sfpIframeBusterJs = document.createElement('script');
+      sfpIframeBusterJs.src = '//native.sharethrough.com/assets/sfp-set-targeting.js';
+      sfpIframeBusterJs.type = 'text/javascript';
+      try {
+        window.document.getElementsByTagName('body')[0].appendChild(sfpIframeBusterJs);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    var clientJsLoaded = (window.safeframeDetected) ? !!(window.STR && window.STR.Tag) : !!(window.top.STR && window.top.STR.Tag);
+    console.log(window.safeframeDetected);
+    console.log(clientJsLoaded);
+    console.log(window.STR);
+    if (!clientJsLoaded) {
+      var sfpJs = document.createElement('script');
+      sfpJs.src = '//native.sharethrough.com/assets/sfp.js';
+      sfpJs.type = 'text/javascript';
+
+      try {
+        if (safeframeDetected) {
+          window.document.getElementsByTagName('body')[0].appendChild(sfpJs);
+        } else {
+          window.top.document.getElementsByTagName('body')[0].appendChild(sfpJs);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }
 };
 
 function getLargestSize(sizes) {
@@ -129,51 +180,16 @@ function generateAd(body, req) {
 
   if (req.strData.stayInIframe) {
     // Don't break out of iframe
-    adMarkup = adMarkup + `<script src="//native.sharethrough.com/assets/sfp.js"></script>`
+    adMarkup = adMarkup + `<script src="//native.sharethrough.com/assets/sfp.js"></script>`;
   } else {
     // Break out of iframe
     adMarkup = adMarkup + `
       <script>
-        (function() {
-          // are we in a safeframe? if so, we should not break out and we should load sfp.js directly
-          var safeframeDetected = false;
-          try {
-            window.top.location.href;
-          } catch (e) {
-            if (e instanceof DOMException) {
-              safeframeDetected = true;
-            }
-          }
-          
-          if (!safeframeDetected) {
-            var sfp_iframe_buster_js = document.createElement('script');
-            sfp_iframe_buster_js.src = "//native.sharethrough.com/assets/sfp-set-targeting.js";
-            sfp_iframe_buster_js.type = 'text/javascript';
-            try {
-                window.document.getElementsByTagName('body')[0].appendChild(sfp_iframe_buster_js);
-            } catch (e) {
-              console.error(e);
-            }
-          }
-          
-          var clientJsLoaded = (safeframeDetected) ? !!(window.STR && window.STR.Tag) : !!(window.top.STR && window.top.STR.Tag);
-          if (!clientJsLoaded) {
-            var sfp_js = document.createElement('script');
-            sfp_js.src = "//native.sharethrough.com/assets/sfp.js";
-            sfp_js.type = 'text/javascript';
-            
-            try {
-              if (safeframeDetected) {
-                window.document.getElementsByTagName('body')[0].appendChild(sfp_js);
-              } else {
-                window.top.document.getElementsByTagName('body')[0].appendChild(sfp_js);
-              }
-            } catch (e) {
-              console.error(e);
-            }
-          }
-        })()
-    </script>`
+        (${sharethroughAdapterSpec.isInSafeframe.toString()})()
+      </script>
+      <script>
+        (${sharethroughAdapterSpec.iFrameHandler.toString()})()
+      </script>`;
   }
 
   return adMarkup;
