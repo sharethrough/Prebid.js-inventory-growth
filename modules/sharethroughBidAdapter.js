@@ -168,10 +168,6 @@ function handleIframe () {
   }
 
   var clientJsLoaded = (!iframeBusterLoaded) ? !!(window.STR && window.STR.Tag) : !!(window.top.STR && window.top.STR.Tag);
-  console.log('iframe buster has been loaded: ' + iframeBusterLoaded);
-  console.log('clientJS has been loaded: ' + clientJsLoaded);
-  console.log(window.STR);
-
   if (!clientJsLoaded) {
     var sfpJs = document.createElement('script');
     sfpJs.src = '//native.sharethrough.com/assets/sfp.js';
