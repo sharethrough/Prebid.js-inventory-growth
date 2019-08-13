@@ -1,5 +1,5 @@
 import { expect } from 'chai';
-import { sharethroughAdapterSpec } from 'modules/sharethroughBidAdapter';
+import { sharethroughAdapterSpec, sharethroughInternal } from 'modules/sharethroughBidAdapter';
 import { newBidder } from 'src/adapters/bidderFactory';
 
 const spec = newBidder(sharethroughAdapterSpec).getSpec();
@@ -46,7 +46,7 @@ const prebidRequests = [
       placement_key: 'pKey'
     },
     strData: {
-      stayInIframe: false,
+      skipIframeBusting: false,
       sizes: []
     }
   },
@@ -58,7 +58,7 @@ const prebidRequests = [
       placement_key: 'pKey'
     },
     strData: {
-      stayInIframe: true,
+      skipIframeBusting: true,
       sizes: [[300, 250], [300, 300], [250, 250], [600, 50]]
     }
   },
@@ -70,7 +70,7 @@ const prebidRequests = [
       placement_key: 'pKey'
     },
     strData: {
-      stayInIframe: true,
+      skipIframeBusting: true,
       iframeSize: [500, 500],
       sizes: [[300, 250], [300, 300], [250, 250], [600, 50]]
     }
@@ -83,7 +83,7 @@ const prebidRequests = [
       placement_key: 'pKey'
     },
     strData: {
-      stayInIframe: false,
+      skipIframeBusting: false,
       sizes: [[0, 0]]
     }
   },
@@ -95,7 +95,7 @@ const prebidRequests = [
       placement_key: 'pKey'
     },
     strData: {
-      stayInIframe: false,
+      skipIframeBusting: false,
       sizes: [[300, 250], [300, 300], [250, 250], [600, 50]]
     }
   },
@@ -134,6 +134,57 @@ const setUserAgent = (str) => {
     return str;
   });
 };
+
+describe('sharethrough internal spec', function () {
+  describe('we are in a safeframe', function () {
+    const originalWindow = global.window;
+    let detectorStub, windowSpy, windowTopSpy;
+
+    beforeEach(function() {
+      windowSpy = sinon.spy(window.document, 'getElementsByTagName');
+      windowTopSpy = sinon.spy(window.top.document, 'getElementsByTagName');
+
+      global.window = {
+        top: {
+          location: {
+            toString: () => { throw new DOMException() }
+          }
+        }
+      };
+    });
+
+    afterEach(function() {
+      windowSpy.restore();
+      windowTopSpy.restore();
+      global.window = originalWindow;
+    });
+
+    it('appends sfp.js to the safeframe', function () {
+      spec.iFrameHandler();
+      expect(windowSpy.calledOnce).to.be.true;
+    });
+
+    it('does not append anything if sfp.js is already loaded', function () {
+      window['__defineGetter__'](
+        'STR', function() { return { Tag: true } }
+      );
+      // let tagDetectorStub = sinon.stub(window, 'STR').returns({ Tag: true });
+      spec.iFrameHandler();
+      expect(windowSpy.notCalled).to.be.true;
+      expect(windowTopSpy.notCalled).to.be.true;
+      // tagDetectorStub.restore();
+    });
+  });
+
+  // describe('we are in a regular iframe', function () {
+  //   let detectorStub, windowSpy, windowTopSpy;
+  //   it('appends sfp.js to window.top', function () {
+  //   });
+  //
+  //   it('only appends sfp-set-targeting.js if sfp.js is already loaded', function () {
+  //   });
+  // });
+});
 
 describe('sharethrough adapter spec', function () {
   describe('.code', function () {
@@ -230,7 +281,7 @@ describe('sharethrough adapter spec', function () {
       const builtBidRequests = spec.buildRequests(bidRequests);
       expect(builtBidRequests[0]).to.deep.include({
         strData: {
-          stayInIframe: undefined,
+          skipIframeBusting: undefined,
           iframeSize: undefined,
           sizes: [[600, 300]]
         }
@@ -253,7 +304,7 @@ describe('sharethrough adapter spec', function () {
         });
     });
 
-    it('returns a correctly parsed out response with largest size when strData.stayInIframe is true', function () {
+    it('returns a correctly parsed out response with largest size when strData.skipIframeBusting is true', function () {
       expect(spec.interpretResponse(bidderResponse, prebidRequests[1])[0]).to.include(
         {
           width: 300,
@@ -267,7 +318,7 @@ describe('sharethrough adapter spec', function () {
         });
     });
 
-    it('returns a correctly parsed out response with explicitly defined size when strData.stayInIframe is true and strData.iframeSize is provided', function () {
+    it('returns a correctly parsed out response with explicitly defined size when strData.skipIframeBusting is true and strData.iframeSize is provided', function () {
       expect(spec.interpretResponse(bidderResponse, prebidRequests[2])[0]).to.include(
         {
           width: 500,
@@ -281,7 +332,7 @@ describe('sharethrough adapter spec', function () {
         });
     });
 
-    it('returns a correctly parsed out response with explicitly defined size when strData.stayInIframe is false and strData.sizes contains [0, 0] only', function () {
+    it('returns a correctly parsed out response with explicitly defined size when strData.skipIframeBusting is false and strData.sizes contains [0, 0] only', function () {
       expect(spec.interpretResponse(bidderResponse, prebidRequests[3])[0]).to.include(
         {
           width: 0,
@@ -295,7 +346,7 @@ describe('sharethrough adapter spec', function () {
         });
     });
 
-    it('returns a correctly parsed out response with explicitly defined size when strData.stayInIframe is false and strData.sizes contains multiple sizes', function () {
+    it('returns a correctly parsed out response with explicitly defined size when strData.skipIframeBusting is false and strData.sizes contains multiple sizes', function () {
       expect(spec.interpretResponse(bidderResponse, prebidRequests[4])[0]).to.include(
         {
           width: 300,
@@ -324,7 +375,7 @@ describe('sharethrough adapter spec', function () {
       expect(spec.interpretResponse(bidResponse, prebidRequests[0])).to.be.an('array').that.is.empty;
     });
 
-    it('correctly generates ad markup', function () {
+    it('correctly generates ad markup when skipIframeBusting is false', function () {
       const adMarkup = spec.interpretResponse(bidderResponse, prebidRequests[0])[0].ad;
       let resp = null;
 
@@ -333,11 +384,13 @@ describe('sharethrough adapter spec', function () {
       expect(adMarkup).to.match(
         /data-str-native-key="pKey" data-stx-response-name=\"str_response_bidId\"/);
       expect(!!adMarkup.indexOf(resp)).to.eql(true);
-      expect(adMarkup).to.match(
-        /iFrameHandler/);
+
+      // insert functionality to autodetect whether or not in safeframe, and handle JS insertion
+      expect(adMarkup).to.match(/isInSafeframe/);
+      expect(adMarkup).to.match(/handleIframe/);
     });
 
-    it('correctly generates ad markup for staying in iframe', function () {
+    it('correctly generates ad markup when skipIframeBusting is true', function () {
       const adMarkup = spec.interpretResponse(bidderResponse, prebidRequests[1])[0].ad;
       let resp = null;
 
@@ -383,56 +436,5 @@ describe('sharethrough adapter spec', function () {
       const syncArray = spec.getUserSyncs({ pixelEnabled: false }, serverResponses);
       expect(syncArray).to.be.an('array').that.is.empty;
     });
-  });
-
-  describe('shareThroughIframeHandler', function () {
-    describe('we are in a safeframe', function () {
-      const originalWindow = global.window;
-      let detectorStub, windowSpy, windowTopSpy;
-
-      beforeEach(function() {
-        windowSpy = sinon.spy(window.document, 'getElementsByTagName');
-        windowTopSpy = sinon.spy(window.top.document, 'getElementsByTagName');
-
-        global.window = {
-          top: {
-            location: {
-              toString: () => { throw new DOMException() }
-            }
-          }
-        };
-      });
-
-      afterEach(function() {
-        windowSpy.restore();
-        windowTopSpy.restore();
-        global.window = originalWindow;
-      });
-
-      it('appends sfp.js to the safeframe', function () {
-        spec.iFrameHandler();
-        expect(windowSpy.calledOnce).to.be.true;
-      });
-
-      it('does not append anything if sfp.js is already loaded', function () {
-        window['__defineGetter__'](
-          'STR', function() { return { Tag: true } }
-        );
-        // let tagDetectorStub = sinon.stub(window, 'STR').returns({ Tag: true });
-        spec.iFrameHandler();
-        expect(windowSpy.notCalled).to.be.true;
-        expect(windowTopSpy.notCalled).to.be.true;
-        // tagDetectorStub.restore();
-      });
-    });
-
-    // describe('we are in a regular iframe', function () {
-    //   let detectorStub, windowSpy, windowTopSpy;
-    //   it('appends sfp.js to window.top', function () {
-    //   });
-    //
-    //   it('only appends sfp-set-targeting.js if sfp.js is already loaded', function () {
-    //   });
-    // });
   });
 });

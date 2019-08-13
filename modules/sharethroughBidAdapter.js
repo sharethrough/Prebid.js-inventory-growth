@@ -1,13 +1,16 @@
 import { registerBidder } from '../src/adapters/bidderFactory';
 
-const VERSION = '3.0.1';
+const VERSION = '3.1.0';
 const BIDDER_CODE = 'sharethrough';
 const STR_ENDPOINT = document.location.protocol + '//btlr.sharethrough.com/WYu2BXv1/v1';
 const DEFAULT_SIZE = [1, 1];
 
-let SAFEFRAME_DETECTED;
-let IFRAMES_FOUND;
-let IFRAME_STACK;
+// this allows stubbing of utility function that is used internally by the sharethrough adapter
+export const sharethroughInternal = {
+  b64EncodeUnicode,
+  handleIframe,
+  isInSafeframe
+};
 
 export const sharethroughAdapterSpec = {
   code: BIDDER_CODE,
@@ -15,10 +18,6 @@ export const sharethroughAdapterSpec = {
   isBidRequestValid: bid => !!bid.params.pkey && bid.bidder === BIDDER_CODE,
 
   buildRequests: (bidRequests, bidderRequest) => {
-    console.log(bidderRequest)
-    SAFEFRAME_DETECTED = !bidderRequest.reachedTop;
-    IFRAMES_FOUND = bidderRequest.numIframes;
-    IFRAME_STACK = bidderRequest.stack;
     return bidRequests.map(bidRequest => {
       let query = {
         placement_key: bidRequest.params.pkey,
@@ -45,7 +44,7 @@ export const sharethroughAdapterSpec = {
       // Data that does not need to go to the server,
       // but we need as part of interpretResponse()
       const strData = {
-        stayInIframe: bidRequest.params.iframe,
+        skipIframeBusting: bidRequest.params.iframe,
         iframeSize: bidRequest.params.iframeSize,
         sizes: bidRequest.sizes
       };
@@ -109,50 +108,7 @@ export const sharethroughAdapterSpec = {
   onBidWon: (bid) => {},
 
   // Empty implementation for prebid core to be able to find it
-  onSetTargeting: (bid) => {},
-
-  isInSafeframe: () => {
-    window.safeframeDetected = false;
-    try {
-      window.safeframeDetected = !window.top.location.toString();
-    } catch (e) {
-      window.safeframeDetected = (e instanceof DOMException);
-    }
-  },
-
-  iFrameHandler: () => {
-    // are we in a safeframe? if so, we should not break out and we should load sfp.js directly
-    if (!window.safeframeDetected) {
-      var sfpIframeBusterJs = document.createElement('script');
-      sfpIframeBusterJs.src = '//native.sharethrough.com/assets/sfp-set-targeting.js';
-      sfpIframeBusterJs.type = 'text/javascript';
-      try {
-        window.document.getElementsByTagName('body')[0].appendChild(sfpIframeBusterJs);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
-    var clientJsLoaded = (window.safeframeDetected) ? !!(window.STR && window.STR.Tag) : !!(window.top.STR && window.top.STR.Tag);
-    console.log(window.safeframeDetected);
-    console.log(clientJsLoaded);
-    console.log(window.STR);
-    if (!clientJsLoaded) {
-      var sfpJs = document.createElement('script');
-      sfpJs.src = '//native.sharethrough.com/assets/sfp.js';
-      sfpJs.type = 'text/javascript';
-
-      try {
-        if (safeframeDetected) {
-          window.document.getElementsByTagName('body')[0].appendChild(sfpJs);
-        } else {
-          window.top.document.getElementsByTagName('body')[0].appendChild(sfpJs);
-        }
-      } catch (e) {
-        console.error(e);
-      }
-    }
-  }
+  onSetTargeting: (bid) => {}
 };
 
 function getLargestSize(sizes) {
@@ -178,21 +134,69 @@ function generateAd(body, req) {
     <script>var ${strRespId} = "${b64EncodeUnicode(JSON.stringify(body))}"</script>
   `;
 
-  if (req.strData.stayInIframe) {
+  if (req.strData.skipIframeBusting) {
     // Don't break out of iframe
     adMarkup = adMarkup + `<script src="//native.sharethrough.com/assets/sfp.js"></script>`;
   } else {
-    // Break out of iframe
+    // Add logic to the markup that detects whether or not in safeframe, adding iframe buster and sfp.js as appropriate
     adMarkup = adMarkup + `
       <script>
-        (${sharethroughAdapterSpec.isInSafeframe.toString()})()
+        (${sharethroughInternal.isInSafeframe.toString()})()
       </script>
       <script>
-        (${sharethroughAdapterSpec.iFrameHandler.toString()})()
+        (${sharethroughInternal.handleIframe.toString()})()
       </script>`;
   }
 
   return adMarkup;
+}
+
+function handleIframe () {
+  // only load iframe buster JS if we aren't in a safeframe
+  // assumes previous execution of the internal isInSafeframe
+  var iframeBusterLoaded = false;
+  if (!window.safeframeDetected) {
+    var sfpIframeBusterJs = document.createElement('script');
+    sfpIframeBusterJs.src = '//native.sharethrough.com/assets/sfp-set-targeting.js';
+    sfpIframeBusterJs.type = 'text/javascript';
+    try {
+      window.document.getElementsByTagName('body')[0].appendChild(sfpIframeBusterJs);
+      iframeBusterLoaded = true;
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  var clientJsLoaded = (!iframeBusterLoaded) ? !!(window.STR && window.STR.Tag) : !!(window.top.STR && window.top.STR.Tag);
+  console.log('iframe buster has been loaded: ' + iframeBusterLoaded);
+  console.log('clientJS has been loaded: ' + clientJsLoaded);
+  console.log(window.STR);
+
+  if (!clientJsLoaded) {
+    var sfpJs = document.createElement('script');
+    sfpJs.src = '//native.sharethrough.com/assets/sfp.js';
+    sfpJs.type = 'text/javascript';
+
+    // only add sfp js to window.top if iframe busting successfully loaded; otherwise, add to iframe
+    try {
+      if (iframeBusterLoaded) {
+        window.top.document.getElementsByTagName('body')[0].appendChild(sfpJs);
+      } else {
+        window.document.getElementsByTagName('body')[0].appendChild(sfpJs);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+}
+
+function isInSafeframe () {
+  window.safeframeDetected = false;
+  try {
+    window.safeframeDetected = !window.top.location.toString();
+  } catch (e) {
+    window.safeframeDetected = (e instanceof DOMException);
+  }
 }
 
 // See https://developer.mozilla.org/en-US/docs/Web/API/WindowBase64/Base64_encoding_and_decoding#The_Unicode_Problem
