@@ -120,15 +120,6 @@ const bidderResponse = {
   header: { get: (header) => header }
 };
 
-// Mirrors the one in modules/sharethroughBidAdapter.js as the function is unexported
-const b64EncodeUnicode = (str) => {
-  return btoa(
-    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
-      function toSolidBytes(match, p1) {
-        return String.fromCharCode('0x' + p1);
-      }));
-};
-
 const setUserAgent = (str) => {
   window.navigator['__defineGetter__']('userAgent', function () {
     return str;
@@ -136,54 +127,56 @@ const setUserAgent = (str) => {
 };
 
 describe('sharethrough internal spec', function () {
+  let windowSpy, windowTopSpy;
+
+  beforeEach(function() {
+    windowSpy = sinon.spy(window.document, 'getElementsByTagName');
+    windowTopSpy = sinon.spy(window.top.document, 'getElementsByTagName');
+  });
+
+  afterEach(function() {
+    windowSpy.restore();
+    windowTopSpy.restore();
+    window.STR = undefined;
+    window.top.STR = undefined;
+  });
+
   describe('we are in a safeframe', function () {
-    const originalWindow = global.window;
-    let detectorStub, windowSpy, windowTopSpy;
-
     beforeEach(function() {
-      windowSpy = sinon.spy(window.document, 'getElementsByTagName');
-      windowTopSpy = sinon.spy(window.top.document, 'getElementsByTagName');
-
-      global.window = {
-        top: {
-          location: {
-            toString: () => { throw new DOMException() }
-          }
-        }
-      };
+      window.safeframeDetected = true;
     });
 
     afterEach(function() {
-      windowSpy.restore();
-      windowTopSpy.restore();
-      global.window = originalWindow;
+      window.safeframeDetected = false;
     });
 
     it('appends sfp.js to the safeframe', function () {
-      spec.iFrameHandler();
+      sharethroughInternal.handleIframe();
       expect(windowSpy.calledOnce).to.be.true;
     });
 
-    it('does not append anything if sfp.js is already loaded', function () {
-      window['__defineGetter__'](
-        'STR', function() { return { Tag: true } }
-      );
-      // let tagDetectorStub = sinon.stub(window, 'STR').returns({ Tag: true });
-      spec.iFrameHandler();
+    it('does not append anything if sfp.js is already loaded in the safeframe', function () {
+      window.STR = { Tag: true };
+      sharethroughInternal.handleIframe();
       expect(windowSpy.notCalled).to.be.true;
       expect(windowTopSpy.notCalled).to.be.true;
-      // tagDetectorStub.restore();
     });
   });
 
-  // describe('we are in a regular iframe', function () {
-  //   let detectorStub, windowSpy, windowTopSpy;
-  //   it('appends sfp.js to window.top', function () {
-  //   });
-  //
-  //   it('only appends sfp-set-targeting.js if sfp.js is already loaded', function () {
-  //   });
-  // });
+  describe('we are in a regular iframe', function () {
+    it('appends sfp.js to window.top', function () {
+      sharethroughInternal.handleIframe();
+      expect(windowSpy.calledOnce).to.be.true;
+      expect(windowTopSpy.calledOnce).to.be.true;
+    });
+
+    it('only appends sfp-set-targeting.js if sfp.js is already loaded on the page', function () {
+      window.top.STR = { Tag: true };
+      sharethroughInternal.handleIframe();
+      expect(windowSpy.calledOnce).to.be.true;
+      expect(windowTopSpy.notCalled).to.be.true;
+    });
+  });
 });
 
 describe('sharethrough adapter spec', function () {
@@ -191,7 +184,7 @@ describe('sharethrough adapter spec', function () {
     it('should return a bidder code of sharethrough', function () {
       expect(spec.code).to.eql('sharethrough');
     });
-  })
+  });
 
   describe('.isBidRequestValid', function () {
     it('should return false if req has no pkey', function () {
@@ -227,7 +220,7 @@ describe('sharethrough adapter spec', function () {
       expect(builtBidRequests[0].url).to.eq(
         'http://btlr.sharethrough.com/WYu2BXv1/v1');
       expect(builtBidRequests[1].url).to.eq(
-        'http://btlr.sharethrough.com/WYu2BXv1/v1')
+        'http://btlr.sharethrough.com/WYu2BXv1/v1');
       expect(builtBidRequests[0].method).to.eq('GET');
     });
 
@@ -380,7 +373,7 @@ describe('sharethrough adapter spec', function () {
       let resp = null;
 
       expect(() => btoa(JSON.stringify(bidderResponse))).to.throw();
-      expect(() => resp = b64EncodeUnicode(JSON.stringify(bidderResponse))).not.to.throw();
+      expect(() => resp = sharethroughInternal.b64EncodeUnicode(JSON.stringify(bidderResponse))).not.to.throw();
       expect(adMarkup).to.match(
         /data-str-native-key="pKey" data-stx-response-name=\"str_response_bidId\"/);
       expect(!!adMarkup.indexOf(resp)).to.eql(true);
@@ -395,7 +388,7 @@ describe('sharethrough adapter spec', function () {
       let resp = null;
 
       expect(() => btoa(JSON.stringify(bidderResponse))).to.throw();
-      expect(() => resp = b64EncodeUnicode(JSON.stringify(bidderResponse))).not.to.throw();
+      expect(() => resp = sharethroughInternal.b64EncodeUnicode(JSON.stringify(bidderResponse))).not.to.throw();
       expect(adMarkup).to.match(
         /data-str-native-key="pKey" data-stx-response-name=\"str_response_bidId\"/);
       expect(!!adMarkup.indexOf(resp)).to.eql(true);
