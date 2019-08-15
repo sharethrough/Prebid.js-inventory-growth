@@ -141,13 +141,13 @@ describe('sharethrough internal spec', function () {
     window.top.STR = undefined;
   });
 
-  describe('we are in a safeframe', function () {
+  describe('we cannot access top level document', function () {
     beforeEach(function() {
-      window.safeframeDetected = true;
+      window.lockedInFrame = true;
     });
 
     afterEach(function() {
-      window.safeframeDetected = false;
+      window.lockedInFrame = false;
     });
 
     it('appends sfp.js to the safeframe', function () {
@@ -163,7 +163,7 @@ describe('sharethrough internal spec', function () {
     });
   });
 
-  describe('we are in a regular iframe', function () {
+  describe('we are able to bust out of the iframe', function () {
     it('appends sfp.js to window.top', function () {
       sharethroughInternal.handleIframe();
       expect(windowSpy.calledOnce).to.be.true;
@@ -379,7 +379,7 @@ describe('sharethrough adapter spec', function () {
       expect(!!adMarkup.indexOf(resp)).to.eql(true);
 
       // insert functionality to autodetect whether or not in safeframe, and handle JS insertion
-      expect(adMarkup).to.match(/isInSafeframe/);
+      expect(adMarkup).to.match(/isLockedInFrame/);
       expect(adMarkup).to.match(/handleIframe/);
     });
 
