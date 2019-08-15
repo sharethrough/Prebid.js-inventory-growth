@@ -9,7 +9,7 @@ const DEFAULT_SIZE = [1, 1];
 export const sharethroughInternal = {
   b64EncodeUnicode,
   handleIframe,
-  isInSafeframe
+  isLockedInFrame
 };
 
 export const sharethroughAdapterSpec = {
@@ -138,10 +138,11 @@ function generateAd(body, req) {
     // Don't break out of iframe
     adMarkup = adMarkup + `<script src="//native.sharethrough.com/assets/sfp.js"></script>`;
   } else {
-    // Add logic to the markup that detects whether or not in safeframe, adding iframe buster and sfp.js as appropriate
+    // Add logic to the markup that detects whether or not in top level document is accessible
+    // this logic will deploy sfp.js and/or iframe buster script(s) as appropriate
     adMarkup = adMarkup + `
       <script>
-        (${sharethroughInternal.isInSafeframe.toString()})()
+        (${sharethroughInternal.isLockedInFrame.toString()})()
       </script>
       <script>
         (${sharethroughInternal.handleIframe.toString()})()
@@ -152,10 +153,10 @@ function generateAd(body, req) {
 }
 
 function handleIframe () {
-  // only load iframe buster JS if we aren't in a safeframe
-  // assumes previous execution of the internal isInSafeframe
+  // only load iframe buster JS if we can access the top level document
+  // if we are 'locked in' to this frame then no point trying to bust out: we may as well render in the frame instead
   var iframeBusterLoaded = false;
-  if (!window.safeframeDetected) {
+  if (!window.lockedInFrame) {
     var sfpIframeBusterJs = document.createElement('script');
     sfpIframeBusterJs.src = '//native.sharethrough.com/assets/sfp-set-targeting.js';
     sfpIframeBusterJs.type = 'text/javascript';
@@ -186,12 +187,14 @@ function handleIframe () {
   }
 }
 
-function isInSafeframe () {
-  window.safeframeDetected = false;
+// determines if we are capable of busting out of the iframe we are in
+// if we catch a DOMException when trying to access top-level document, it means we're stuck in the frame we're in
+function isLockedInFrame () {
+  window.lockedInFrame = false;
   try {
-    window.safeframeDetected = !window.top.location.toString();
+    window.lockedInFrame = !window.top.document;
   } catch (e) {
-    window.safeframeDetected = (e instanceof DOMException);
+    window.lockedInFrame = (e instanceof DOMException);
   }
 }
 
