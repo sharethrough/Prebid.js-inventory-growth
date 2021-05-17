@@ -11,7 +11,6 @@ const DEFAULT_SIZE = [1, 1];
 export const sharethroughInternal = {
   b64EncodeUnicode,
   handleIframe,
-  isLockedInFrame,
   getProtocol
 };
 
@@ -202,7 +201,7 @@ function generateAd(body, req) {
     // this logic will deploy sfp.js and/or iframe buster script(s) as appropriate
     adMarkup = adMarkup + `
       <script>
-        (${sharethroughInternal.isLockedInFrame.toString()})()
+        (${utils.inIframe.toString()})()
       </script>
       <script>
         (${sharethroughInternal.handleIframe.toString()})()
@@ -244,17 +243,6 @@ function handleIframe () {
     } catch (e) {
       utils.logError('Trouble writing sfp script, error details:', e);
     }
-  }
-}
-
-// determines if we are capable of busting out of the iframe we are in
-// if we catch a DOMException when trying to access top-level document, it means we're stuck in the frame we're in
-function isLockedInFrame () {
-  window.lockedInFrame = false;
-  try {
-    window.lockedInFrame = !window.top.document;
-  } catch (e) {
-    window.lockedInFrame = (e instanceof DOMException);
   }
 }
 

@@ -569,7 +569,7 @@ describe('sharethrough adapter spec', function() {
       expect(!!adMarkup.indexOf(resp)).to.eql(true);
 
       // insert functionality to autodetect whether or not in safeframe, and handle JS insertion
-      expect(adMarkup).to.match(/isLockedInFrame/);
+      expect(adMarkup).to.match(/inIframe/);
       expect(adMarkup).to.match(/handleIframe/);
     });
 
