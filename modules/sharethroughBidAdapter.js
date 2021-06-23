@@ -82,11 +82,10 @@ export const sharethroughAdapterSpec = {
 
     const imps = bidRequests.map(bidReq => {
       const impression = {};
-      impression.ext = {};
 
       const gpid = utils.deepAccess(bidReq, 'ortb2Imp.ext.data.pbadslot');
       if (gpid) {
-        impression.ext.gpid = gpid;
+        impression.ext = { gpid: gpid };
       }
 
       if (bidReq.mediaTypes && bidReq.mediaTypes.video) {
