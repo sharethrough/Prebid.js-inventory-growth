@@ -7,7 +7,7 @@ const VERSION = '4.3.0';
 const BIDDER_CODE = 'sharethrough';
 const SUPPLY_ID = 'WYu2BXv1';
 
-const STR_ENDPOINT = `https://btlr.sharethrough.com/universal/v1?supply_id=${SUPPLY_ID}`;
+const STR_ENDPOINT = `https://btlr.sharethrough.com/universal/v1/hackathon?supply_id=${SUPPLY_ID}`;
 
 // this allows stubbing of utility function that is used internally by the sharethrough adapter
 export const sharethroughInternal = {
@@ -233,19 +233,20 @@ export const sharethroughAdapterSpec = {
     }
 
     return shouldCookieSync ? serverResponses[0].body.cookieSyncUrls.map((url) => (
-      { type: 'image',
+      {
+        type: 'image',
         url: url + syncurl
       })) : [];
   },
 
   // Empty implementation for prebid core to be able to find it
-  onTimeout: (data) => {},
+  onTimeout: (data) => { },
 
   // Empty implementation for prebid core to be able to find it
-  onBidWon: (bid) => {},
+  onBidWon: (bid) => { },
 
   // Empty implementation for prebid core to be able to find it
-  onSetTargeting: (bid) => {},
+  onSetTargeting: (bid) => { },
 };
 
 function getVideoApi({ api }) {
