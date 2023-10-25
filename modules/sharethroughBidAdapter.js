@@ -2,12 +2,68 @@ import { registerBidder } from '../src/adapters/bidderFactory.js';
 import { config } from '../src/config.js';
 import { BANNER, VIDEO } from '../src/mediaTypes.js';
 import { deepAccess, generateUUID, inIframe } from '../src/utils.js';
+// Import the script load function
+import { loadExternalScript } from '../src/adloader.js';
 
 const VERSION = '4.3.0';
 const BIDDER_CODE = 'sharethrough';
 const SUPPLY_ID = 'WYu2BXv1';
 
 const STR_ENDPOINT = `https://btlr.sharethrough.com/universal/v1?supply_id=${SUPPLY_ID}`;
+
+// --- Begin Contxtful Receptivity Integration ---
+
+// 1. Declare constants, and variables holding the receptivity values
+const CONTXTFUL_MODULE_CODE = 'contxtful';
+let initialReceptivity;
+let contxtfulApi;
+
+/**
+ * 2. Define the function calling the Contxtful API to inject the Javascript connector in page.
+ */
+function initReceptivity() {
+  const CONTXTFUL_CONNECTOR_HOSTNAME = 'api.receptivity.io';
+  const version = 'v1';
+  const customer = 'USE_YOUR_CUSTOMER_KEY'; // TODO: Replace this value with your own customer ID
+  const connectorServerUrl = `https://${CONTXTFUL_CONNECTOR_HOSTNAME}/${version}/prebid/${customer}/connector/p.js`;
+  const loaderScript = loadExternalScript(
+    connectorServerUrl,
+    CONTXTFUL_MODULE_CODE
+  );
+  addRxEventListeners(loaderScript);
+}
+
+/**
+ * 3. Function to register event listeners on the receptivity connector
+ * @param {*} loaderScript The externally loaded script object.
+ */
+function addRxEventListeners(loaderScript) {
+  loaderScript.addEventListener(
+    'initialReceptivity',
+    ({ detail: receptivity }) => {
+      initialReceptivity = receptivity.ReceptivityState;
+    }
+  );
+  loaderScript.addEventListener('rxEngineIsReady', ({ detail: api }) => {
+    contxtfulApi = api;
+  });
+}
+
+/**
+ * 4. Define the function to retrieve the best available receptivity value
+ */
+function getReceptivity() {
+  let isConnectorReady = !!contxtfulApi?.GetReceptivity();
+
+  return isConnectorReady
+    ? contxtfulApi.GetReceptivity().ReceptivityState
+    : initialReceptivity;
+}
+
+// 5. Call the Contxtful API to retrieve the receptivity value
+// NOTE: a feature flag could also be used e.g. bidderSettings.get(BIDDER_CODE, 'allowReceptivity');
+initReceptivity();
+// --- End Contxtful Receptivity Integration ---
 
 // this allows stubbing of utility function that is used internally by the sharethrough adapter
 export const sharethroughInternal = {
@@ -58,6 +114,18 @@ export const sharethroughAdapterSpec = {
           schain: bidRequests[0].schain,
         },
       },
+      // --- Begin Contxtful Receptivity Integration ---
+      // 6. Insert the receptivity value into the global first party data object
+      user: {
+        ext: {
+          data: {
+            receptivity: getReceptivity(),
+          },
+        },
+        ...firstPartyData.user,
+      },
+
+      // --- End Contxtful Receptivity Integration ---
       bcat: deepAccess(bidderRequest.ortb2, 'bcat') || bidRequests[0].params.bcat || [],
       badv: deepAccess(bidderRequest.ortb2, 'badv') || bidRequests[0].params.badv || [],
       test: 0,
