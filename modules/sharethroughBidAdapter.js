@@ -144,7 +144,7 @@ export const sharethroughAdapterSpec = {
 
         return {
           id: bidReq.bidId,
-          tagid: String(bidReq.params.pkey),
+          tagid: String(bidReq.params?.pkey),
           secure: secure ? 1 : 0,
           bidfloor: getBidRequestFloor(bidReq),
           ...impression,
