@@ -250,7 +250,7 @@ function getBidRequestFloor(bid) {
       floor = parseFloat(floorInfo.floor);
     }
   }
-  return floor !== null ? floor : bid.params.floor;
+  return floor !== null ? floor : bid.params?.floor;
 }
 
 function getProtocol() {
