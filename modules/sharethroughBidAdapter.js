@@ -165,58 +165,26 @@ export const sharethroughAdapterSpec = {
   },
 
   interpretResponse: ({ body }, req) => {
+    // TODO: Commented all this out, but in real life we need to still support ortb auctions
     if (
-      !body ||
-      !body.seatbid ||
-      body.seatbid.length === 0 ||
-      !body.seatbid[0].bid ||
-      body.seatbid[0].bid.length === 0
+      !body// ||
+      // !body.seatbid ||
+      // body.seatbid.length === 0 ||
+      // !body.seatbid[0].bid ||
+      // body.seatbid[0].bid.length === 0
     ) {
       return [];
     }
+    const bids = [];
 
-    const bids = body.seatbid[0].bid.map((bid) => {
-      // Spec: https://docs.prebid.org/dev-docs/bidder-adaptor.html#interpreting-the-response
-      const response = {
-        requestId: bid.impid,
-        width: +bid.w,
-        height: +bid.h,
-        cpm: +bid.price,
-        creativeId: bid.crid,
-        dealId: bid.dealid || null,
-        mediaType: req.data.imp[0].video ? VIDEO : BANNER,
-        currency: body.cur || 'USD',
-        netRevenue: true,
-        ttl: 360,
-        ad: bid.adm,
-        nurl: bid.nurl,
-        meta: {
-          advertiserDomains: bid.adomain || [],
-          networkId: bid.ext?.networkId || null,
-          networkName: bid.ext?.networkName || null,
-          agencyId: bid.ext?.agencyId || null,
-          agencyName: bid.ext?.agencyName || null,
-          advertiserId: bid.ext?.advertiserId || null,
-          advertiserName: bid.ext?.advertiserName || null,
-          brandId: bid.ext?.brandId || null,
-          brandName: bid.ext?.brandName || null,
-          demandSource: bid.ext?.demandSource || null,
-          dchain: bid.ext?.dchain || null,
-          primaryCatId: bid.ext?.primaryCatId || null,
-          secondaryCatIds: bid.ext?.secondaryCatIds || null,
-          mediaType: bid.ext?.mediaType || null,
-        },
-      };
+    const fledgeAuctionConfigs = parseAuctionConfigs(body);
 
-      if (response.mediaType === VIDEO) {
-        response.ttl = 3600;
-        response.vastXml = bid.adm;
-      }
-
-      return response;
-    });
-
-    return bids;
+    if (fledgeAuctionConfigs) {
+      // Return a tuple of bids and auctionConfigs. It is possible that bids could be null.
+      return { bids, fledgeAuctionConfigs };
+    } else {
+      return bids;
+    }
   },
 
   getUserSyncs: (syncOptions, serverResponses, gdprConsent, gppConsent) => {
@@ -292,6 +260,10 @@ function getProtocol() {
 // stub for ?? operator
 function nullish(input, def) {
   return input === null || input === undefined ? def : input;
+}
+
+function parseAuctionConfigs(adserverResponseBody) {
+  return adserverResponseBody?.ext?.prebid?.fledge?.auctionconfigs
 }
 
 registerBidder(sharethroughAdapterSpec);
