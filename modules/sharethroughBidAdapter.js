@@ -175,7 +175,7 @@ export const sharethroughAdapterSpec = {
       return [];
     }
 
-    return body.seatbid[0].bid.map((bid) => {
+    const bids = body.seatbid[0].bid.map((bid) => {
       // Spec: https://docs.prebid.org/dev-docs/bidder-adaptor.html#interpreting-the-response
       const response = {
         requestId: bid.impid,
@@ -215,6 +215,8 @@ export const sharethroughAdapterSpec = {
 
       return response;
     });
+
+    return bids;
   },
 
   getUserSyncs: (syncOptions, serverResponses, gdprConsent, gppConsent) => {
