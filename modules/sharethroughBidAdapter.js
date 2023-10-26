@@ -7,7 +7,8 @@ const VERSION = '4.3.0';
 const BIDDER_CODE = 'sharethrough';
 const SUPPLY_ID = 'WYu2BXv1';
 
-const STR_ENDPOINT = `https://btlr.sharethrough.com/universal/v1/hackathon?supply_id=${SUPPLY_ID}`;
+// Temporary hackathon endpoint for privacy sandbox
+const STR_ENDPOINT = `https://btlr-canary-us-east-1.sharethrough.com/hackathon/universal?supply_id=${SUPPLY_ID}`;
 
 // this allows stubbing of utility function that is used internally by the sharethrough adapter
 export const sharethroughInternal = {
