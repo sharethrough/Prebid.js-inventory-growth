@@ -263,7 +263,23 @@ function nullish(input, def) {
 }
 
 function parseAuctionConfigs(adserverResponseBody) {
-  return adserverResponseBody?.ext?.prebid?.fledge?.auctionconfigs
+  // Little hack so we don't have to redeploy adserver,
+  // but the adserver response will eventually change to
+  // follow this structure
+  //
+  // Actual adserver response: { bidId: 123, param1: blabla, param2: blabla}
+  const auctionConfigsButTheConfigIsNotObject = adserverResponseBody?.ext?.prebid?.fledge?.auctionconfigs
+
+  // Desired adserver response: { bidId: 123, config: {param1: blabla, param2: blabla} }
+  const correctedAuctionConfigs = auctionConfigsButTheConfigIsNotObject.map(config => {
+    const { bidId, ...restOfConfig } = config;
+    return {
+      bidId,
+      config: restOfConfig
+    }
+  });
+
+  return correctedAuctionConfigs;
 }
 
 registerBidder(sharethroughAdapterSpec);
