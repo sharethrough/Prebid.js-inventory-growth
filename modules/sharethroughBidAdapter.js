@@ -19,7 +19,7 @@ export const sharethroughAdapterSpec = {
   code: BIDDER_CODE,
   supportedMediaTypes: [VIDEO, BANNER],
   gvlid: 80,
-  isBidRequestValid: (bid) => !!bid.params.pkey && bid.bidder === BIDDER_CODE,
+  isBidRequestValid: (bid) => /* !!bid.params.pkey && */ bid.bidder === BIDDER_CODE,
 
   buildRequests: (bidRequests, bidderRequest) => {
     const timeout = bidderRequest.timeout;
