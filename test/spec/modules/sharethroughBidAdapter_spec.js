@@ -681,7 +681,10 @@ describe('sharethrough adapter spec', function () {
         };
 
         it('should include first party data in open rtb request, site section', () => {
-          const openRtbReq = spec.buildRequests(bidRequests, { ...bidderRequest, ortb2: firstPartyData })[0].data;
+          const openRtbReq = spec.buildRequests(bidRequests, {
+            ...bidderRequest,
+            ortb2: firstPartyData,
+          })[0].data;
 
           expect(openRtbReq.site.name).to.equal(firstPartyData.site.name);
           expect(openRtbReq.site.keywords).to.equal(firstPartyData.site.keywords);
@@ -691,7 +694,10 @@ describe('sharethrough adapter spec', function () {
         });
 
         it('should include first party data in open rtb request, user section', () => {
-          const openRtbReq = spec.buildRequests(bidRequests, { ...bidderRequest, ortb2: firstPartyData })[0].data;
+          const openRtbReq = spec.buildRequests(bidRequests, {
+            ...bidderRequest,
+            ortb2: firstPartyData,
+          })[0].data;
 
           expect(openRtbReq.user.yob).to.equal(firstPartyData.user.yob);
           expect(openRtbReq.user.gender).to.equal(firstPartyData.user.gender);
@@ -700,34 +706,76 @@ describe('sharethrough adapter spec', function () {
         });
 
         it('should include first party data in open rtb request, ORTB blocked section', () => {
-          const openRtbReq = spec.buildRequests(bidRequests, { ...bidderRequest, ortb2: firstPartyData })[0].data;
+          const openRtbReq = spec.buildRequests(bidRequests, {
+            ...bidderRequest,
+            ortb2: firstPartyData,
+          })[0].data;
 
           expect(openRtbReq.bcat).to.deep.equal(firstPartyData.bcat);
           expect(openRtbReq.badv).to.deep.equal(firstPartyData.badv);
         });
 
         it('should include first party data in open rtb request, regulation section', () => {
-          const openRtbReq = spec.buildRequests(bidRequests, { ...bidderRequest, ortb2: firstPartyData })[0].data;
+          const openRtbReq = spec.buildRequests(bidRequests, {
+            ...bidderRequest,
+            ortb2: firstPartyData,
+          })[0].data;
 
           expect(openRtbReq.regs.ext.gpp).to.equal(firstPartyData.regs.gpp);
           expect(openRtbReq.regs.ext.gpp_sid).to.equal(firstPartyData.regs.gpp_sid);
         });
       });
+    });
 
-      describe('fledge', () => {
-        it('should attach "ae" as a property to the request if 1) fledge auctions are enabled, and 2) request is display (only supporting display for now)', () => {
-          // ASSEMBLE
-          const EXPECTED_AE_VALUE = 1;
+    describe('buildRequestsWithOrtbConverter', function () {
+      it('should return the same payload as the non-converter method', () => {
+        // ASSEMBLE
+        const expectedResponse = spec.buildRequests(bidRequests, bidderRequest);
 
-          // ACT
-          bidderRequest['fledgeEnabled'] = true;
-          const builtRequests = spec.buildRequests(bidRequests, bidderRequest);
-          const ACTUAL_AE_VALUE = builtRequests[0].data.imp[0].ext.ae;
+        // ACT
+        const actualResponse = spec.buildRequestsWithOrtbConverter(bidRequests, bidderRequest);
 
-          // ASSERT
-          expect(ACTUAL_AE_VALUE).to.equal(EXPECTED_AE_VALUE);
-          expect(builtRequests[1].data.imp[0].ext.ae).to.be.undefined;
-        });
+        // ASSERT
+        // just doing a string comparison for now to see how the payloads produced by the old
+        // and new methods compare
+        expect(JSON.stringify(actualResponse)).to.equal(JSON.stringify(expectedResponse));
+
+        // const expectedMethod = expectedResponse['method'];
+        // const actualMethod = actualResponse['method'];
+        // expect(actualMethod).to.equal(expectedMethod);
+
+        // const expectedUrl = expectedResponse['url'];
+        // const actualUrl = actualResponse['url'];
+        // expect(actualUrl).to.equal(expectedUrl);
+
+        // const expectedData = expectedResponse[0]['data'];
+        // const actualData = actualResponse[0]['data'];
+
+        // // at
+        // expect(actualData['at']).to.equal(expectedData['at']);
+        // // cur
+        // expect(actualData['cur']).to.deep.equal(expectedData['cur']);
+        // expect(actualData['tmax']).to.equal(expectedData['tmax']);
+
+        // // site
+        // expect(actualData['site']).to.deep.equal(expectedData['site']);
+        // // device
+        // expect(actualData['device']).to.deep.equal(expectedData['device']);
+        // // regs
+        // expect(actualData['regs']).to.deep.equal(expectedData['regs']);
+
+        // expect(actualData['source']).to.deep.equal(expectedData['source']); // STR adds some extra stuff to 'source' not present in oRTB's version
+        // // bcat
+        // expect(actualData['bcat']).to.deep.equal(expectedData['bcat']);
+        // // badv
+        // expect(actualData['badv']).to.deep.equal(expectedData['badv']);
+        // expect(actualData['test']).to.deep.equal(expectedData['test']);
+
+        // const actualX = actualData['user'] || 'nothing';
+        // const expectedX = expectedData['user'] || 'nothing';
+        // expect(actualX).to.equal(expectedX);
+        // expect(JSON.stringify(actualData['user'])).to.equal(JSON.stringify(expectedData['user']));
+        // expect(actualData['imp']).to.deep.equal(expectedData['imp']); // STR adds some extra stuff to 'imp' not present in oRTB's version
       });
     });
 

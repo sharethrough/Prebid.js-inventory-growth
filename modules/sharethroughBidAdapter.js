@@ -1,7 +1,8 @@
+import { ortbConverter } from '../libraries/ortbConverter/converter.js';
 import { registerBidder } from '../src/adapters/bidderFactory.js';
 import { config } from '../src/config.js';
 import { BANNER, VIDEO } from '../src/mediaTypes.js';
-import { deepAccess, generateUUID, inIframe, mergeDeep } from '../src/utils.js';
+import { deepAccess, deepSetValue, generateUUID, inIframe, mergeDeep } from '../src/utils.js';
 
 const VERSION = '4.3.0';
 const BIDDER_CODE = 'sharethrough';
@@ -13,6 +14,50 @@ const STR_ENDPOINT = `https://btlr.sharethrough.com/universal/v1?supply_id=${SUP
 export const sharethroughInternal = {
   getProtocol,
 };
+
+// special adapter-specific utility function that applies sharethrough-specific properties to a bid request
+function applySharethroughProperties(objToAddTo, bidRequest, bidderRequest) {
+  // TODO: build out this function to include other things like cdep, etc.
+  // that's in the current "buildRequests" function
+
+  // const timeout = bidderRequest.timeout;
+  const firstPartyData = bidderRequest.ortb2 || {};
+  // const nonHttp = sharethroughInternal.getProtocol().indexOf('http') < 0;
+  // const secure = nonHttp || sharethroughInternal.getProtocol().indexOf('https') > -1;
+
+  const site = {
+    domain: deepAccess(bidderRequest, 'refererInfo.domain', window.location.hostname),
+    page: deepAccess(bidderRequest, 'refererInfo.page', window.location.href),
+    ref: deepAccess(bidderRequest, 'refererInfo.ref'),
+    ...firstPartyData.site,
+  };
+  const device = {
+    ua: navigator.userAgent,
+    language: navigator.language,
+    js: 1,
+    dnt: navigator.doNotTrack === '1' ? 1 : 0,
+    h: window.screen.height,
+    w: window.screen.width,
+  };
+  const regs = {
+    coppa: config.getConfig('coppa') === true ? 1 : 0,
+    ext: {},
+  };
+  const bcat = deepAccess(bidderRequest.ortb2, 'bcat') || bidRequest.params.bcat || [];
+  const badv = deepAccess(bidderRequest.ortb2, 'badv') || bidRequest.params.badv || [];
+  const user = nullish(firstPartyData.user, {});
+
+  deepSetValue(objToAddTo, 'at', 1);
+  deepSetValue(objToAddTo, 'cur', ['USD']);
+  deepSetValue(objToAddTo, 'site', site);
+  deepSetValue(objToAddTo, 'device', device);
+  deepSetValue(objToAddTo, 'regs', regs);
+  deepSetValue(objToAddTo, 'bcat', bcat);
+  deepSetValue(objToAddTo, 'badv', badv);
+  deepSetValue(objToAddTo, 'user', user);
+
+  return objToAddTo;
+}
 
 export const sharethroughAdapterSpec = {
   code: BIDDER_CODE,
@@ -148,9 +193,15 @@ export const sharethroughAdapterSpec = {
             plcmt: videoRequest.plcmt ? videoRequest.plcmt : null,
           };
 
-          if (videoRequest.delivery) impression.video.delivery = videoRequest.delivery;
-          if (videoRequest.companiontype) impression.video.companiontype = videoRequest.companiontype;
-          if (videoRequest.companionad) impression.video.companionad = videoRequest.companionad;
+          if (videoRequest.delivery) {
+            impression.video.delivery = videoRequest.delivery;
+          }
+          if (videoRequest.companiontype) {
+            impression.video.companiontype = videoRequest.companiontype;
+          }
+          if (videoRequest.companionad) {
+            impression.video.companionad = videoRequest.companionad;
+          }
         } else {
           impression.banner = {
             pos: deepAccess(bidReq, 'mediaTypes.banner.pos', 0),
@@ -177,6 +228,40 @@ export const sharethroughAdapterSpec = {
           ...req,
           imp: [impression],
         },
+      };
+    });
+  },
+
+  /**
+   * Starter implementation for a version of buildRequests that uses the ortbConverter library
+   * @param {*} bidRequests
+   * @param {*} bidderRequest
+   * @returns An array of payloads of shape { method: 'POST', url: STR_ENDPOINT, data: { ... } }, representing bid requests to the Sharethrough exchange
+   */
+  buildRequestsWithOrtbConverter: (bidRequests, bidderRequest) => {
+    // CONVERTER, build one so that we can use it to convert bidRequests to ORTB
+    const converter = ortbConverter({
+      // override the default imp function to add tid and gpid to the .ext property of each impression request
+      imp(buildImp, bidRequest, context) {
+        // TODO: build out this code to include the items included in the bid-specific
+        // code loop that starts around line 137
+        const imp = buildImp(bidRequest);
+        const tid = deepAccess(bidRequest, 'ortb2Imp.ext.tid');
+        if (tid) context.imp.ext.tid = tid;
+        const gpid = deepAccess(bidRequest, 'ortb2Imp.ext.gpid', deepAccess(bidRequest, 'ortb2Imp.ext.data.pbadslot'));
+        if (gpid) context.imp.ext.gpid = gpid;
+
+        return imp;
+      },
+    });
+
+    return bidRequests.map((bidRequest) => {
+      // build the data to be sent using the toORTB function from the converter
+      const dataParam = converter.toORTB({ bidderRequest, bidRequests: [bidRequest] });
+      return {
+        method: 'POST',
+        url: STR_ENDPOINT,
+        data: applySharethroughProperties(dataParam, bidRequest, bidderRequest),
       };
     });
   },
@@ -249,7 +334,12 @@ export const sharethroughAdapterSpec = {
     const shouldCookieSync =
       syncOptions.pixelEnabled && deepAccess(serverResponses, '0.body.cookieSyncUrls') !== undefined;
 
-    return shouldCookieSync ? serverResponses[0].body.cookieSyncUrls.map((url) => ({ type: 'image', url: url })) : [];
+    return shouldCookieSync
+      ? serverResponses[0].body.cookieSyncUrls.map((url) => ({
+          type: 'image',
+          url: url,
+        }))
+      : [];
   },
 
   // Empty implementation for prebid core to be able to find it
