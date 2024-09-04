@@ -129,37 +129,39 @@ export const sharethroughAdapterSpec = {
             [w, h] = videoRequest.playerSize[0];
           }
 
-          const getVideoPlacementValue = (vidReq) => {
-            if (vidReq.plcmt) {
-              return vidReq.placement;
-            } else {
-              return vidReq.context === 'instream' ? 1 : +deepAccess(vidReq, 'placement', 4);
+          /**
+           * Applies a specified property to an impression object if it is present in the video request
+           * @param {string} prop A property to apply to the impression object
+           * @param {object} vidReq A video request object from which to extract the property
+           * @param {object} imp A video impression object to which to apply the property
+           */
+          const applyVideoProperty = (prop, vidReq, imp) => {
+            const propTakesArrayValues = ['api', 'mimes', 'playbackmethod', 'protocols'].includes(prop);
+            if (propTakesArrayValues) {
+              const assignableArray = vidReq[prop] && Array.isArray(vidReq[prop]) && vidReq[prop].length > 0;
+              if (!assignableArray) {
+                return;
+              }
+            }
+            if (vidReq[prop]) {
+              imp.video[prop] = vidReq[prop];
             }
           };
 
           impression.video = {
             pos: nullish(videoRequest.pos, 0),
             topframe: inIframe() ? 0 : 1,
-            skip: nullish(videoRequest.skip, 0),
-            linearity: nullish(videoRequest.linearity, 1),
-            minduration: nullish(videoRequest.minduration, 5),
-            maxduration: nullish(videoRequest.maxduration, 60),
-            playbackmethod: videoRequest.playbackmethod || [2],
-            api: getVideoApi(videoRequest),
-            mimes: videoRequest.mimes || ['video/mp4'],
-            protocols: getVideoProtocols(videoRequest),
             w,
             h,
-            startdelay: nullish(videoRequest.startdelay, 0),
-            skipmin: nullish(videoRequest.skipmin, 0),
-            skipafter: nullish(videoRequest.skipafter, 0),
-            placement: getVideoPlacementValue(videoRequest),
-            plcmt: videoRequest.plcmt ? videoRequest.plcmt : null,
           };
 
-          if (videoRequest.delivery) impression.video.delivery = videoRequest.delivery;
-          if (videoRequest.companiontype) impression.video.companiontype = videoRequest.companiontype;
-          if (videoRequest.companionad) impression.video.companionad = videoRequest.companionad;
+          const propertiesToConsider = [
+            'api', 'companionad', 'companiontype', 'delivery', 'linearity', 'maxduration', 'mimes', 'minduration', 'placement', 'playbackmethod', 'plcmt', 'protocols', 'skip', 'skipafter', 'skipmin', 'startdelay'
+          ]
+
+          propertiesToConsider.forEach(propertyToConsider => {
+            applyVideoProperty(propertyToConsider, videoRequest, impression);
+          });
         } else {
           impression.banner = {
             pos: deepAccess(bidReq, 'mediaTypes.banner.pos', 0),
@@ -270,24 +272,6 @@ export const sharethroughAdapterSpec = {
   // Empty implementation for prebid core to be able to find it
   onSetTargeting: (bid) => {},
 };
-
-function getVideoApi({ api }) {
-  let defaultValue = [2];
-  if (api && Array.isArray(api) && api.length > 0) {
-    return api;
-  } else {
-    return defaultValue;
-  }
-}
-
-function getVideoProtocols({ protocols }) {
-  let defaultValue = [2, 3, 5, 6, 7, 8];
-  if (protocols && Array.isArray(protocols) && protocols.length > 0) {
-    return protocols;
-  } else {
-    return defaultValue;
-  }
-}
 
 function getBidRequestFloor(bid) {
   let floor = null;
