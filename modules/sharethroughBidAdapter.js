@@ -1,7 +1,7 @@
 import { registerBidder } from '../src/adapters/bidderFactory.js';
 import { config } from '../src/config.js';
 import { BANNER, VIDEO } from '../src/mediaTypes.js';
-import { deepAccess, generateUUID, inIframe, mergeDeep } from '../src/utils.js';
+import { deepAccess, generateUUID, inIframe, logWarn, mergeDeep } from '../src/utils.js';
 
 const VERSION = '4.3.0';
 const BIDDER_CODE = 'sharethrough';
@@ -136,10 +136,11 @@ export const sharethroughAdapterSpec = {
            * @param {object} imp A video impression object to which to apply the property
            */
           const applyVideoProperty = (prop, vidReq, imp) => {
-            const propTakesArrayValues = ['api', 'mimes', 'playbackmethod', 'protocols'].includes(prop);
-            if (propTakesArrayValues) {
-              const assignableArray = vidReq[prop] && Array.isArray(vidReq[prop]) && vidReq[prop].length > 0;
-              if (!assignableArray) {
+            const propIsTypeArray = ['api', 'mimes', 'playbackmethod', 'protocols'].includes(prop);
+            if (propIsTypeArray) {
+              const notAssignable = (!Array.isArray(vidReq[prop]) || vidReq[prop].length === 0) && vidReq[prop];
+              if (notAssignable) {
+                logWarn(`Invalid video request property: "${prop}" must be an array with at least 1 entry.  Value supplied: "${vidReq[prop]}".  This will not be added to the bid request.`);
                 return;
               }
             }

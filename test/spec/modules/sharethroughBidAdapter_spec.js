@@ -585,12 +585,9 @@ describe('sharethrough adapter spec', function () {
           expect(videoImp.companionad).to.equal('companion ad');
         });
 
-        it('should set defaults if no value provided', () => {
+        it('should set defaults in some circumstances if no value provided', () => {
           delete bidRequests[1].mediaTypes.video.pos;
           delete bidRequests[1].mediaTypes.video.playerSize;
-          delete bidRequests[1].mediaTypes.video.delivery;
-          delete bidRequests[1].mediaTypes.video.companiontype;
-          delete bidRequests[1].mediaTypes.video.companionad;
 
           const builtRequest = spec.buildRequests(bidRequests, bidderRequest)[1];
 
@@ -598,12 +595,9 @@ describe('sharethrough adapter spec', function () {
           expect(videoImp.pos).to.equal(0);
           expect(videoImp.w).to.equal(640);
           expect(videoImp.h).to.equal(360);
-          expect(videoImp.delivery).to.be.undefined;
-          expect(videoImp.companiontype).to.be.undefined;
-          expect(videoImp.companionad).to.be.undefined;
         });
 
-        it('should not set array-defined properties if non-array values are provided', () => {
+        it('should not set values in some circumstances when non-valid values are supplied', () => {
           // arrange
           bidRequests[1].mediaTypes.video.api = 1; // non-array value, will not be used
           bidRequests[1].mediaTypes.video.mimes = 'video/3gpp'; // non-array value, will not be used
@@ -619,6 +613,25 @@ describe('sharethrough adapter spec', function () {
           expect(videoImp.mimes).to.be.undefined;
           expect(videoImp.playbackmethod).to.be.undefined;
           expect(videoImp.protocols).to.be.undefined;
+        });
+
+        it('should not set a property if no corresponding property is detected on mediaTypes.video', () => {
+          // arrange
+          const propertiesToConsider = [
+            'api', 'companionad', 'companiontype', 'delivery', 'linearity', 'maxduration', 'mimes', 'minduration', 'placement', 'playbackmethod', 'plcmt', 'protocols', 'skip', 'skipafter', 'skipmin', 'startdelay'
+          ]
+
+          // act
+          propertiesToConsider.forEach(propertyToConsider => {
+            delete bidRequests[1].mediaTypes.video[propertyToConsider];
+          });
+          const builtRequest = spec.buildRequests(bidRequests, bidderRequest)[1];
+          const videoImp = builtRequest.data.imp[0].video;
+
+          // assert
+          propertiesToConsider.forEach(propertyToConsider => {
+            expect(videoImp[propertyToConsider]).to.be.undefined;
+          });
         });
 
         describe('outstream', () => {
