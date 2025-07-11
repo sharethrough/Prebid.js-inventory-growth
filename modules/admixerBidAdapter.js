@@ -5,6 +5,7 @@ import {BANNER, VIDEO, NATIVE} from '../src/mediaTypes.js';
 import {convertOrtbRequestToProprietaryNative} from '../src/native.js';
 
 const BIDDER_CODE = 'admixer';
+const GVLID = 511;
 const ENDPOINT_URL = 'https://inv-nets.admixer.net/prebid.1.2.aspx';
 const ALIASES = [
   {code: 'go2net', endpoint: 'https://ads.go2net.com.ua/prebid.1.2.aspx'},
@@ -16,6 +17,7 @@ const ALIASES = [
 ];
 export const spec = {
   code: BIDDER_CODE,
+  gvlid: GVLID,
   aliases: ALIASES.map(val => isStr(val) ? val : val.code),
   supportedMediaTypes: [BANNER, VIDEO, NATIVE],
   /**
@@ -71,17 +73,17 @@ export const spec = {
       }
     }
     validRequest.forEach((bid) => {
-      let imp = {};
+      const imp = {};
       Object.keys(bid).forEach(key => imp[key] = bid[key]);
       imp.ortb2 && delete imp.ortb2;
-      let bidFloor = getBidFloor(bid);
+      const bidFloor = getBidFloor(bid);
       if (bidFloor) {
         imp.bidFloor = bidFloor;
       }
       payload.imps.push(imp);
     });
 
-    let urlForRequest = endpointUrl || getEndpointUrl(bidderRequest.bidderCode)
+    const urlForRequest = endpointUrl || getEndpointUrl(bidderRequest.bidderCode)
     return {
       method: 'POST',
       url: urlForRequest,

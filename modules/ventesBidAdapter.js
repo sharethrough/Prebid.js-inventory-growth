@@ -54,7 +54,6 @@ function validateMediaSizes(mediaSize) {
       mediaSize.every(size => (isNumber(size) && size >= 0));
 }
 
-
 function validateParameters(parameters) {
   if (!(parameters.placementId)) {
     return false;
@@ -103,13 +102,13 @@ function createServerRequestFromAdUnits(adUnits, bidRequestId, adUnitContext) {
 
 function generateBidRequestsFromAdUnits(bidRequests, bidRequestId, adUnitContext) {
   const userObjBid = ((bidRequests) || []).find(hasUserInfo);
-  let userObj = {};
+  const userObj = {};
   if (userObjBid) {
     Object.keys(userObjBid.params.user)
       .forEach((param) => {
-        let uparam = convertCamelToUnderscore(param);
+        const uparam = convertCamelToUnderscore(param);
         if (param === 'segments' && isArray(userObjBid.params.user[param])) {
-          let segs = [];
+          const segs = [];
           userObjBid.params.user[param].forEach(val => {
             if (isNumber(val)) {
               segs.push({
